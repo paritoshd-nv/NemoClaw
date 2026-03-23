@@ -4,9 +4,9 @@
 
 ## Prerequisites
 
-- **Docker** (pre-installed, v29.x)
+- **Docker** (pre-installed, v28.x)
 - **Node.js 22** (installed by the install.sh)
-- **OpenShell CLI**:
+- **OpenShell CLI** (installed via the Quick Start steps below)
 - **NVIDIA API Key** from [build.nvidia.com](https://build.nvidia.com) — prompted on first run
 
 ## Quick Start
@@ -25,7 +25,7 @@ sudo ./scripts/setup-spark.sh
 # Install NemoClaw using the NemoClaw/install.sh:
 ./install.sh
 
-# Alternatively, you can use the hosted install script: 
+# Alternatively, you can use the hosted install script:
 curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
 ```
 
