@@ -30,8 +30,6 @@ info() { echo -e "${GREEN}>>>${NC} $1"; }
 warn() { echo -e "${YELLOW}>>>${NC} $1"; }
 fail() { echo -e "${RED}>>>${NC} $1"; exit 1; }
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
 # ── Pre-flight checks ─────────────────────────────────────────────
 
 if [ "$(uname -s)" != "Linux" ]; then
@@ -137,5 +135,3 @@ fi
 echo ""
 info "DGX Spark Docker configuration complete."
 info ""
-info "Next step: run 'nemoclaw onboard' to set up your sandbox."
-info "  nemoclaw onboard"
