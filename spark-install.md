@@ -97,7 +97,7 @@ nemoclaw onboard
 
 ## Setup Local Inference (Ollama)
 
-Use this to run inference locally on the DGX Spark's GPU instead of routing to NVIDIA cloud.
+Use this to run inference locally on the DGX Spark's GPU instead of routing to cloud.
 
 ### Step 1: Verify NVIDIA Container Runtime
 
@@ -151,10 +151,10 @@ sudo systemctl daemon-reload
 sudo systemctl restart ollama
 ```
 
-Verify Ollama is listening on `0.0.0.0`:
+Verify Ollama is listening on all interfaces:
 
 ```bash
-sudo netstat -nap | grep 11434
+ss -tlnp | grep 11434
 ```
 
 ### Step 5: Install OpenShell and NemoClaw
