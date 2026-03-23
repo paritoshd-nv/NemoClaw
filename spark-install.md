@@ -171,8 +171,18 @@ When prompted for **Inference options**, select **Local Ollama**, then select th
 ```bash
 # Connect to the sandbox
 nemoclaw my-assistant connect
+```
 
-# Inside the sandbox, talk to the agent
+Inside the sandbox, first verify `inference.local` is reachable directly (must use HTTPS — the proxy intercepts `CONNECT inference.local:443`):
+
+```bash
+curl -s https://inference.local/v1/models
+# Expected: JSON response listing the configured model
+```
+
+Then talk to the agent:
+
+```bash
 openclaw agent --agent main --local -m "Which model and GPU are in use?" --session-id test
 ```
 
