@@ -35,7 +35,7 @@ DGX Spark ships **Ubuntu 24.04 + Docker 28.x** but no k8s/k3s. OpenShell embeds 
 
 ### 1. Docker permissions
 
-```
+```text
 Error in the hyper legacy client: client error (Connect)
   Permission denied (os error 13)
 ```
@@ -45,7 +45,7 @@ Error in the hyper legacy client: client error (Connect)
 
 ### 2. cgroup v2 incompatibility
 
-```
+```text
 K8s namespace not ready
 openat2 /sys/fs/cgroup/kubepods/pids.max: no
 Failed to start ContainerManager: failed to initialize top level QOS containers
@@ -118,7 +118,7 @@ openshell term
 
 ## Architecture Notes
 
-```
+```text
 DGX Spark (Ubuntu 24.04, cgroup v2)
   └── Docker (28.x, cgroupns=host)
        └── OpenShell gateway container
