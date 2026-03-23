@@ -19,7 +19,7 @@ curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | 
 git clone https://github.com/NVIDIA/NemoClaw.git
 cd NemoClaw
 
-# Spark-specific setup
+# Spark-specific setup (For details see [What's Different on Spark](#whats-different-on-spark))
 sudo ./scripts/setup-spark.sh
 
 # Install NemoClaw using the NemoClaw/install.sh:
@@ -29,65 +29,21 @@ sudo ./scripts/setup-spark.sh
 curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
 ```
 
-## What's Different on Spark
-
-DGX Spark ships **Ubuntu 24.04 + Docker 28.x** but no k8s/k3s. OpenShell embeds k3s inside a Docker container, which hits two problems on Spark:
-
-### 1. Docker permissions
-
-```text
-Error in the hyper legacy client: client error (Connect)
-  Permission denied (os error 13)
-```
-
-**Cause**: Your user isn't in the `docker` group.
-**Fix**: `setup-spark` runs `usermod -aG docker $USER`. You may need to log out and back in (or `newgrp docker`) for it to take effect.
-
-### 2. cgroup v2 incompatibility
-
-```text
-K8s namespace not ready
-openat2 /sys/fs/cgroup/kubepods/pids.max: no
-Failed to start ContainerManager: failed to initialize top level QOS containers
-```
-
-**Cause**: Spark runs cgroup v2 (Ubuntu 24.04 default). OpenShell's gateway container starts k3s, which tries to create cgroup v1-style paths that don't exist. The fix is `--cgroupns=host` on the container, but OpenShell doesn't expose that flag.
-
-**Fix**: `setup-spark` sets `"default-cgroupns-mode": "host"` in `/etc/docker/daemon.json` and restarts Docker. This makes all containers use the host cgroup namespace, which is what k3s needs.
-
-## Manual Setup (if setup-spark doesn't work)
-
-### Fix Docker cgroup namespace
+## Verifying Your Install
 
 ```bash
-# Check if you're on cgroup v2
-stat -fc %T /sys/fs/cgroup/
-# Expected: cgroup2fs
+# Check sandbox is running
+nemoclaw my-assistant connect
 
-# Add cgroupns=host to Docker daemon config
-sudo python3 -c "
-import json, os
-path = '/etc/docker/daemon.json'
-d = json.load(open(path)) if os.path.exists(path) else {}
-d['default-cgroupns-mode'] = 'host'
-json.dump(d, open(path, 'w'), indent=2)
-"
-
-# Restart Docker
-sudo systemctl restart docker
+# Inside the sandbox, talk to the agent:
+openclaw agent --agent main --local -m "hello" --session-id test
 ```
 
-### Fix Docker permissions
+## Uninstall (perform this before re-installing)
 
 ```bash
-sudo usermod -aG docker $USER
-newgrp docker  # or log out and back in
-```
-
-### Then run the onboard wizard
-
-```bash
-nemoclaw onboard
+# Uninstall NemoClaw (Remove OpenShell sandboxes, gateway, NemoClaw providers, related Docker containers, images, volumes and configs)
+nemoclaw uninstall
 ```
 
 ## Setup Local Inference (Ollama)
@@ -182,6 +138,61 @@ Then talk to the agent:
 openclaw agent --agent main --local -m "Which model and GPU are in use?" --session-id test
 ```
 
+## What's Different on Spark
+
+DGX Spark ships **Ubuntu 24.04 + Docker 28.x** but no k8s/k3s. OpenShell embeds k3s inside a Docker container, which hits two problems on Spark:
+
+### 1. Docker permissions
+
+```text
+Error in the hyper legacy client: client error (Connect)
+  Permission denied (os error 13)
+```
+
+**Cause**: Your user isn't in the `docker` group.
+**Fix**: `setup-spark` runs `usermod -aG docker $USER`. You may need to log out and back in (or `newgrp docker`) for it to take effect.
+
+### 2. cgroup v2 incompatibility
+
+```text
+K8s namespace not ready
+openat2 /sys/fs/cgroup/kubepods/pids.max: no
+Failed to start ContainerManager: failed to initialize top level QOS containers
+```
+
+**Cause**: Spark runs cgroup v2 (Ubuntu 24.04 default). OpenShell's gateway container starts k3s, which tries to create cgroup v1-style paths that don't exist. The fix is `--cgroupns=host` on the container, but OpenShell doesn't expose that flag.
+
+**Fix**: `setup-spark` sets `"default-cgroupns-mode": "host"` in `/etc/docker/daemon.json` and restarts Docker. This makes all containers use the host cgroup namespace, which is what k3s needs.
+
+## Manual Setup (if setup-spark doesn't work)
+
+### Fix Docker cgroup namespace
+
+```bash
+# Check if you're on cgroup v2
+stat -fc %T /sys/fs/cgroup/
+# Expected: cgroup2fs
+
+# Add cgroupns=host to Docker daemon config
+sudo python3 -c "
+import json, os
+path = '/etc/docker/daemon.json'
+d = json.load(open(path)) if os.path.exists(path) else {}
+d['default-cgroupns-mode'] = 'host'
+json.dump(d, open(path, 'w'), indent=2)
+"
+
+# Restart Docker
+sudo systemctl restart docker
+```
+
+### Fix Docker permissions
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker  # or log out and back in
+```
+
 ## Known Issues
 
 | Issue | Status | Workaround |
@@ -191,22 +202,6 @@ openclaw agent --agent main --local -m "Which model and GPU are in use?" --sessi
 | CoreDNS CrashLoop after setup | Fixed in `fix-coredns.sh` | Uses container gateway IP, not 127.0.0.11 |
 | Image pull failure (k3s can't find built image) | OpenShell bug | `openshell gateway destroy && openshell gateway start`, re-run setup |
 | GPU passthrough | Untested on Spark | Should work with `--gpu` flag if NVIDIA Container Toolkit is configured |
-
-## Verifying Your Install
-
-```bash
-# Check sandbox is running
-openshell sandbox list
-# Should show: nemoclaw  Ready
-
-# Test the agent
-openshell sandbox connect nemoclaw
-# Inside sandbox:
-nemoclaw-start openclaw agent --agent main --local -m 'hello' --session-id test
-
-# Monitor network egress (separate terminal)
-openshell term
-```
 
 ## Architecture Notes
 
