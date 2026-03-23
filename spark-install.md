@@ -161,7 +161,7 @@ ss -tlnp | grep 11434
 
 ```bash
 curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
-curl -fsSL https://nvidia.com/nemoclaw.sh | bash
+curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
 ```
 
 When prompted for **Inference options**, select **Local Ollama**, then select the model you pulled.
@@ -176,8 +176,9 @@ nemoclaw my-assistant connect
 Inside the sandbox, first verify `inference.local` is reachable directly (must use HTTPS — the proxy intercepts `CONNECT inference.local:443`):
 
 ```bash
-curl -s https://inference.local/v1/models
+curl -sf https://inference.local/v1/models
 # Expected: JSON response listing the configured model
+# Exits non-zero on HTTP errors (403, 503, etc.) — failure here indicates a proxy routing regression
 ```
 
 Then talk to the agent:
