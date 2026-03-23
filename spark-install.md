@@ -95,6 +95,87 @@ newgrp docker  # or log out and back in
 nemoclaw onboard
 ```
 
+## Setup Local Inference (Ollama)
+
+Use this to run inference locally on the DGX Spark's GPU instead of routing to NVIDIA cloud.
+
+### Step 1: Verify NVIDIA Container Runtime
+
+```bash
+docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
+```
+
+If this fails, configure the NVIDIA runtime and restart Docker:
+
+```bash
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
+### Step 2: Install Ollama
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+Verify it is running:
+
+```bash
+curl http://localhost:11434
+```
+
+### Step 3: Pull and Pre-load a Model
+
+Download Nemotron 3 Super 120B (~87 GB; may take several minutes):
+
+```bash
+ollama pull nemotron-3-super:120b
+```
+
+Run it briefly to pre-load weights into unified memory, then exit:
+
+```bash
+ollama run nemotron-3-super:120b
+# type /bye to exit
+```
+
+### Step 4: Configure Ollama to Listen on All Interfaces
+
+By default Ollama binds to `127.0.0.1`, which is not reachable from inside the sandbox container. Configure it to listen on all interfaces:
+
+```bash
+sudo mkdir -p /etc/systemd/system/ollama.service.d
+printf '[Service]\nEnvironment="OLLAMA_HOST=0.0.0.0"\n' | sudo tee /etc/systemd/system/ollama.service.d/override.conf
+
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+```
+
+Verify Ollama is listening on `0.0.0.0`:
+
+```bash
+sudo netstat -nap | grep 11434
+```
+
+### Step 5: Install OpenShell and NemoClaw
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+curl -fsSL https://nvidia.com/nemoclaw.sh | bash
+```
+
+When prompted for **Inference options**, select **Local Ollama**, then select the model you pulled.
+
+### Step 6: Connect and Test
+
+```bash
+# Connect to the sandbox
+nemoclaw my-assistant connect
+
+# Inside the sandbox, talk to the agent
+openclaw agent --agent main --local -m "Which model and GPU are in use?" --session-id test
+```
+
 ## Known Issues
 
 | Issue | Status | Workaround |
