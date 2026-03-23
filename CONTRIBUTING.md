@@ -18,6 +18,7 @@ Install the following before you begin.
 - Python 3.11+ (for blueprint and documentation builds)
 - Docker (running)
 - [uv](https://docs.astral.sh/uv/) (for Python dependency management)
+- [hadolint](https://github.com/hadolint/hadolint) (Dockerfile linter — `brew install hadolint` on macOS)
 
 ## Getting Started
 
@@ -57,24 +58,23 @@ These are the primary `make` and `npm` targets for day-to-day development:
 | `cd nemoclaw && npm test` | Run plugin unit tests (Vitest) |
 | `make docs` | Build documentation (Sphinx/MyST) |
 | `make docs-live` | Serve docs locally with auto-rebuild |
-| `prek run --all-files` | Optional: run shared hooks from `.pre-commit-config.yaml` — see below |
+| `npx prek run --all-files` | Run all hooks from `.pre-commit-config.yaml` — see below |
 
-### Optional: prek (pre-commit–compatible)
+### Git hooks (prek)
 
-The repository includes [`.pre-commit-config.yaml`](.pre-commit-config.yaml) for [prek](https://prek.j178.dev/) (recommended) and the Python [`pre-commit`](https://pre-commit.com/) runner — same file, either tool. This **complements** [Husky](.husky/pre-commit), which runs lint-staged and Vitest when you commit.
+All git hooks are managed by [prek](https://prek.j178.dev/), a fast, single-binary pre-commit hook runner installed as a devDependency (`@j178/prek`). The `npm install` step runs `prek install` automatically via the `prepare` script, which wires up the following hooks from [`.pre-commit-config.yaml`](.pre-commit-config.yaml):
 
-Install **prek** (pick one): `brew install prek`, `uv tool install prek`, `pip install prek`, or the [standalone installer](https://prek.j178.dev/installation/). From the repository root:
+| Hook | What runs |
+|------|-----------|
+| **pre-commit** | File fixers, formatters, linters, Vitest (plugin) |
+| **commit-msg** | commitlint (Conventional Commits) |
+| **pre-push** | TypeScript type check (`tsc --noEmit`), Pyright (Python) |
 
-```bash
-prek install
-prek run --all-files   # good check before opening a PR, or after broad edits
-```
+For a full manual check: `npx prek run --all-files`. For scoped runs: `npx prek run --from-ref <base> --to-ref HEAD`.
 
-`make check` remains the primary documented linter entry point. For scoped runs: `prek run --from-ref <base> --to-ref HEAD` (same flags work with `pre-commit` if you use that instead).
+If you still have `core.hooksPath` set from an old Husky setup, Git will ignore `.git/hooks`. Run `git config --unset core.hooksPath` in this repo, then `npm install` so `prek install` (via `prepare`) can register the hooks.
 
-If **prek** is not available, install [`pre-commit`](https://pre-commit.com/) and use `pre-commit install` / `pre-commit run --all-files` with the same config file.
-
-If **prek** (or **pre-commit**) is on your `PATH`, [.husky/pre-push](.husky/pre-push) also runs it on the commits you are about to push (merge-base with `@{u}`, or the last commit if no upstream is set). Husky scripts prefer `node_modules/.bin` so type checks and lint-staged work when `npx` is missing from the environment (for example some GUI Git clients).
+`make check` remains the primary documented linter entry point.
 
 ## Project Structure
 
@@ -133,7 +133,7 @@ The generated `.agents/skills/docs/` directory is committed to the repo but is e
 
 Each skill directory contains:
 
-```
+```text
 .agents/skills/docs/<skill-name>/
 ├── SKILL.md              # Frontmatter + procedures + related skills
 └── references/           # Detailed concept and reference content (loaded on demand)
@@ -173,7 +173,7 @@ Follow these steps to submit a pull request.
 
 This project uses [Conventional Commits](https://www.conventionalcommits.org/). All commit messages must follow the format:
 
-```
+```text
 <type>(<scope>): <description>
 
 [optional body]
@@ -194,7 +194,7 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/). 
 
 **Examples:**
 
-```
+```text
 feat(cli): add --profile flag to nemoclaw onboard
 fix(blueprint): handle missing API key gracefully
 docs: update quickstart for new install wizard
