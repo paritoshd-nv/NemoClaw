@@ -105,12 +105,16 @@ sudo systemctl restart ollama
 Verify Ollama is listening on all interfaces:
 
 ```bash
-ss -tlnp | grep 11434
+sudo ss -tlnp | grep 11434
 ```
 
 ### Step 5: Install OpenShell and NemoClaw
 
 ```bash
+# If the OpenShell and NemoClaw are already installed, uninstall them. A fresh NemoClaw install will run onboard with local inference options.
+nemoclaw uninstall
+
+# Install OpenShell and NemoClaw
 curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
 curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
 ```
