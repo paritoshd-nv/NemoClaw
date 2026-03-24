@@ -50,7 +50,7 @@ nemoclaw uninstall
 
 Use this to run inference locally on the DGX Spark's GPU instead of routing to cloud.
 
-### Step 1: Verify NVIDIA Container Runtime
+### Verify the NVIDIA Container Runtime
 
 ```bash
 docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
@@ -63,7 +63,7 @@ sudo nvidia-ctk runtime configure --runtime=docker
 sudo systemctl restart docker
 ```
 
-### Step 2: Install Ollama
+### Install Ollama
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
@@ -75,7 +75,7 @@ Verify it is running:
 curl http://localhost:11434
 ```
 
-### Step 3: Pull and Pre-load a Model
+### Pull and Pre-load a Model
 
 Download Nemotron 3 Super 120B (~87 GB; may take several minutes):
 
@@ -90,7 +90,7 @@ ollama run nemotron-3-super:120b
 # type /bye to exit
 ```
 
-### Step 4: Configure Ollama to Listen on All Interfaces
+### Configure Ollama to Listen on All Interfaces
 
 By default Ollama binds to `127.0.0.1`, which is not reachable from inside the sandbox container. Configure it to listen on all interfaces:
 
@@ -110,7 +110,7 @@ Verify Ollama is listening on all interfaces:
 sudo ss -tlnp | grep 11434
 ```
 
-### Step 5: Install OpenShell and NemoClaw
+### Install OpenShell and NemoClaw
 
 ```bash
 # If the OpenShell and NemoClaw are already installed, uninstall them. A fresh NemoClaw install will run onboard with local inference options.
@@ -123,7 +123,7 @@ curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
 
 When prompted for **Inference options**, select **Local Ollama**, then select the model you pulled.
 
-### Step 6: Connect and Test
+### Connect and Test
 
 ```bash
 # Connect to the sandbox
