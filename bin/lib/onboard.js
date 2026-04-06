@@ -2024,14 +2024,29 @@ async function createSandbox(
         process.exit(1);
       }
 
-      console.log(`  Sandbox '${sandboxName}' already exists.`);
-      console.log("  Choosing 'n' will delete the existing sandbox and create a new one.");
-      const answer = await promptOrDefault("  Reuse existing sandbox? [Y/n]: ", null, "y");
-      const normalizedAnswer = answer.trim().toLowerCase();
-      if (normalizedAnswer !== "n" && normalizedAnswer !== "no") {
-        upsertMessagingProviders(messagingTokenDefs);
-        ensureDashboardForward(sandboxName, chatUiUrl);
-        return sandboxName;
+      if (existingSandboxState === "ready") {
+        console.log(`  Sandbox '${sandboxName}' already exists.`);
+        console.log("  Choosing 'n' will delete the existing sandbox and create a new one.");
+        const answer = await promptOrDefault("  Reuse existing sandbox? [Y/n]: ", null, "y");
+        const normalizedAnswer = answer.trim().toLowerCase();
+        if (normalizedAnswer !== "n" && normalizedAnswer !== "no") {
+          upsertMessagingProviders(messagingTokenDefs);
+          ensureDashboardForward(sandboxName, chatUiUrl);
+          return sandboxName;
+        }
+      } else {
+        console.log(`  Sandbox '${sandboxName}' exists but is not ready.`);
+        console.log("  Selecting 'n' will abort onboarding.");
+        const answer = await promptOrDefault(
+          "  Delete it and create a new one? [Y/n]: ",
+          null,
+          "y",
+        );
+        const normalizedAnswer = answer.trim().toLowerCase();
+        if (normalizedAnswer === "n" || normalizedAnswer === "no") {
+          console.log("  Aborting onboarding.");
+          process.exit(1);
+        }
       }
     }
 

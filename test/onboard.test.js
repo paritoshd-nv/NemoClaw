@@ -2371,6 +2371,120 @@ const { createSandbox } = require(${onboardPath});
     },
   );
 
+  it(
+    "interactive mode auto-recreates when existing sandbox is not ready",
+    { timeout: 60_000 },
+    async () => {
+      const repoRoot = path.join(import.meta.dirname, "..");
+      const tmpDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "nemoclaw-onboard-interactive-notready-"),
+      );
+      const fakeBin = path.join(tmpDir, "bin");
+      const scriptPath = path.join(tmpDir, "interactive-notready.js");
+      const onboardPath = JSON.stringify(path.join(repoRoot, "bin", "lib", "onboard.js"));
+      const runnerPath = JSON.stringify(path.join(repoRoot, "bin", "lib", "runner.js"));
+      const registryPath = JSON.stringify(path.join(repoRoot, "bin", "lib", "registry.js"));
+      const credentialsPath = JSON.stringify(path.join(repoRoot, "bin", "lib", "credentials.js"));
+
+      fs.mkdirSync(fakeBin, { recursive: true });
+      fs.writeFileSync(path.join(fakeBin, "openshell"), "#!/usr/bin/env bash\nexit 0\n", {
+        mode: 0o755,
+      });
+
+      const script = String.raw`
+const runner = require(${runnerPath});
+const registry = require(${registryPath});
+const credentials = require(${credentialsPath});
+const childProcess = require("node:child_process");
+const { EventEmitter } = require("node:events");
+
+const commands = [];
+let sandboxDeleted = false;
+runner.run = (command, opts = {}) => {
+  commands.push({ command, env: opts.env || null });
+  if (command.includes("'sandbox' 'delete'")) sandboxDeleted = true;
+  return { status: 0 };
+};
+runner.runCapture = (command) => {
+  // Existing sandbox that is NOT ready initially, becomes Ready after recreation
+  if (command.includes("'sandbox' 'get' 'my-assistant'")) return "my-assistant";
+  if (command.includes("'sandbox' 'list'")) {
+    return sandboxDeleted ? "my-assistant Ready" : "my-assistant NotReady";
+  }
+  if (command.includes("'forward' 'list'")) return "";
+  return "";
+};
+registry.getSandbox = () => ({ name: "my-assistant", gpuEnabled: false });
+registry.registerSandbox = () => true;
+registry.removeSandbox = () => true;
+
+const preflight = require(${JSON.stringify(path.join(repoRoot, "bin", "lib", "preflight.js"))});
+preflight.checkPortAvailable = async () => ({ ok: true });
+
+// User confirms recreation when prompted
+credentials.prompt = async () => "y";
+
+childProcess.spawn = (...args) => {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  commands.push({ command: args[1][1], env: args[2]?.env || null });
+  process.nextTick(() => {
+    child.stdout.emit("data", Buffer.from("Created sandbox: my-assistant\n"));
+    child.emit("close", 0);
+  });
+  return child;
+};
+
+const { createSandbox } = require(${onboardPath});
+
+(async () => {
+  process.env.OPENSHELL_GATEWAY = "nemoclaw";
+  const sandboxName = await createSandbox(null, "gpt-5.4", "nvidia-prod", null, "my-assistant");
+  console.log(JSON.stringify({ sandboxName, commands }));
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+`;
+      fs.writeFileSync(scriptPath, script);
+
+      // Run WITHOUT NEMOCLAW_NON_INTERACTIVE to exercise interactive path
+      const env = {
+        ...process.env,
+        HOME: tmpDir,
+        PATH: `${fakeBin}:${process.env.PATH || ""}`,
+      };
+      delete env["NEMOCLAW_NON_INTERACTIVE"];
+      delete env["NEMOCLAW_RECREATE_SANDBOX"];
+      const result = spawnSync(process.execPath, [scriptPath], {
+        cwd: repoRoot,
+        encoding: "utf-8",
+        env,
+      });
+
+      assert.equal(result.status, 0, result.stderr);
+      const payloadLine = result.stdout
+        .trim()
+        .split("\n")
+        .slice()
+        .reverse()
+        .find((line) => line.startsWith("{") && line.endsWith("}"));
+      assert.ok(payloadLine, `expected JSON payload in stdout:\n${result.stdout}`);
+      const payload = JSON.parse(payloadLine);
+
+      assert.ok(
+        payload.commands.some((entry) => entry.command.includes("'sandbox' 'delete'")),
+        "should delete not-ready sandbox after user confirms",
+      );
+      assert.ok(
+        payload.commands.some((entry) => entry.command.includes("'sandbox' 'create'")),
+        "should recreate sandbox when existing one is not ready",
+      );
+      assert.ok(result.stdout.includes("not ready"), "should mention sandbox is not ready");
+    },
+  );
+
   it("upsertProvider creates a new provider and returns ok on success", () => {
     const repoRoot = path.join(import.meta.dirname, "..");
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-upsert-provider-create-"));

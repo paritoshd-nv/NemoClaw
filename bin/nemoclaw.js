@@ -791,7 +791,13 @@ async function onboard(args) {
   const recreateSandbox = args.includes("--recreate-sandbox");
   const acceptThirdPartySoftware =
     args.includes(NOTICE_ACCEPT_FLAG) || String(process.env[NOTICE_ACCEPT_ENV] || "") === "1";
-  await runOnboard({ nonInteractive, resume, recreateSandbox, fromDockerfile, acceptThirdPartySoftware });
+  await runOnboard({
+    nonInteractive,
+    resume,
+    recreateSandbox,
+    fromDockerfile,
+    acceptThirdPartySoftware,
+  });
 }
 
 async function setup(args = []) {
