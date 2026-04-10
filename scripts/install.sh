@@ -683,6 +683,20 @@ detect_gpu() {
   return 1
 }
 
+run_platform_setup_step() {
+  local setup_script="${SCRIPT_DIR}/setup-jetson.sh"
+  [[ -f "$setup_script" ]] || return 0
+
+  local family=""
+  if detect_gpu; then
+    family="$(bash "$setup_script" --detect)"
+  fi
+  [[ -n "$family" ]] || return 0
+
+  step 0 "Platform-specific Setup"
+  bash "$setup_script" "$family"
+}
+
 get_vram_mb() {
   # Returns total VRAM in MiB (NVIDIA only). Falls back to 0.
   if command_exists nvidia-smi; then
@@ -1189,6 +1203,7 @@ main() {
 
   _INSTALL_START=$SECONDS
   print_banner
+  run_platform_setup_step
 
   step 1 "Node.js"
   install_nodejs
