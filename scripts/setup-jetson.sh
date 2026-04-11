@@ -53,34 +53,6 @@ configure_jetson_host() {
   info "Jetson ${family} detected — applying required host configuration"
   info "Sudo is required for kernel and Docker configuration — you may be prompted for your password."
 
-  case "$family" in
-    orin)
-      sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
-
-      if [[ -f /etc/docker/daemon.json ]]; then
-        sudo cp /etc/docker/daemon.json /etc/docker/daemon.json.bak
-        sudo python3 -c "
-import json, os, tempfile
-path = '/etc/docker/daemon.json'
-with open(path) as f:
-    cfg = json.load(f)
-cfg.pop('iptables', None)
-cfg.pop('bridge', None)
-fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path))
-with os.fdopen(fd, 'w') as f:
-    json.dump(cfg, f, indent=2)
-os.replace(tmp, path)
-"
-      else
-        warn "/etc/docker/daemon.json not found — skipping Docker daemon patch"
-      fi
-      ;;
-    thor) ;; # No daemon.json or iptables changes needed on Thor
-    *)
-      error "Unsupported Jetson family: $family"
-      ;;
-  esac
-
   # Load br_netfilter now and persist it across reboots.
   sudo modprobe br_netfilter
   echo "br_netfilter" | sudo tee /etc/modules-load.d/nemoclaw.conf >/dev/null
@@ -91,14 +63,6 @@ os.replace(tmp, path)
   sudo sysctl -w net.bridge.bridge-nf-call-ip6tables=1 >/dev/null
   printf 'net.bridge.bridge-nf-call-iptables=1\nnet.bridge.bridge-nf-call-ip6tables=1\n' \
     | sudo tee /etc/sysctl.d/99-nemoclaw.conf >/dev/null
-
-  if [[ "$family" == "orin" ]]; then
-    if sudo systemctl list-unit-files docker.service >/dev/null 2>&1; then
-      sudo systemctl restart docker
-    else
-      warn "Docker service not found — skipping restart"
-    fi
-  fi
 
   ok "Jetson ${family} host configuration applied"
 }
