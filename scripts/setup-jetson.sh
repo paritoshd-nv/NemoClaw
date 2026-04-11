@@ -33,7 +33,7 @@ error() {
 
 detect_jetson() {
   local gpu_name
-  gpu_name="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)"
+  gpu_name="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || true)"
   local normalized="${gpu_name,,}"
 
   if [[ "$normalized" == *thor* ]]; then
@@ -50,8 +50,12 @@ detect_jetson() {
 configure_jetson_host() {
   local family="$1"
 
+  if [[ "${NEMOCLAW_NON_INTERACTIVE:-}" == "1" ]] && ! sudo -n true 2>/dev/null; then
+    error "Jetson host setup requires sudo but no password-less sudo is available in non-interactive mode."
+  fi
+
   info "Jetson ${family} detected — applying required host configuration"
-  info "Sudo is required for kernel and Docker configuration — you may be prompted for your password."
+  info "Sudo is required for kernel configuration — you may be prompted for your password."
 
   # Load br_netfilter now and persist it across reboots.
   sudo modprobe br_netfilter

@@ -693,7 +693,6 @@ run_platform_setup_step() {
   fi
   [[ -n "$family" ]] || return 0
 
-  step 0 "Platform-specific Setup"
   bash "$setup_script" "$family"
 }
 
