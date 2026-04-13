@@ -936,6 +936,12 @@ function getSandboxInferenceConfig(model, provider = null, preferredInferenceApi
         supportsStore: false,
       };
       break;
+    case "ollama-local":
+      providerKey = "ollama";
+      primaryModelRef = `ollama/${model}`;
+      inferenceBaseUrl = "https://inference.local";
+      inferenceApi = "ollama";
+      break;
     case "nvidia-prod":
     case "nvidia-nim":
     default:

@@ -45,7 +45,7 @@ export function getLocalProviderBaseUrl(provider: string): string | null {
     case "vllm-local":
       return `${HOST_GATEWAY_URL}:8000/v1`;
     case "ollama-local":
-      return `${HOST_GATEWAY_URL}:11434/v1`;
+      return `${HOST_GATEWAY_URL}:11434`;
     default:
       return null;
   }
