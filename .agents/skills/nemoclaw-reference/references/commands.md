@@ -1,9 +1,6 @@
-<!-- SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved. -->
-<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Commands
 
-The `nemoclaw` CLI is the primary interface for managing NemoClaw sandboxes.
-It is installed automatically by the installer (`curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash`).
+The `nemoclaw` CLI is the primary interface for managing NemoClaw sandboxes. It is installed when you run `npm install -g nemoclaw`.
 
 ## `/nemoclaw` Slash Command
 
@@ -52,7 +49,7 @@ $ nemoclaw onboard [--non-interactive] [--resume] [--from <Dockerfile>]
 
 The wizard prompts for a provider first, then collects the provider credential if needed.
 Supported non-experimental choices include NVIDIA Endpoints, OpenAI, Anthropic, Google Gemini, and compatible OpenAI or Anthropic endpoints.
-Credentials are stored in `~/.nemoclaw/credentials.json`. For file permissions, plaintext storage behavior, and hardening guidance, see Credential Storage (see the `nemoclaw-user-configure-security` skill).
+Credentials are stored in `~/.nemoclaw/credentials.json`. For file permissions, plaintext storage behavior, and hardening guidance, see Credential Storage (see the `nemoclaw-configure-security` skill).
 The legacy `nemoclaw setup` command is deprecated; use `nemoclaw onboard` instead.
 
 If you enable Brave Search during onboarding, NemoClaw currently stores the Brave API key in the sandbox's OpenClaw configuration.
@@ -85,19 +82,8 @@ The wizard prompts for a sandbox name.
 Names must follow RFC 1123 subdomain rules: lowercase alphanumeric characters and hyphens only, and must start and end with an alphanumeric character.
 Uppercase letters are automatically lowercased.
 
-If you enable Slack during onboarding, the wizard collects both the Bot Token (`SLACK_BOT_TOKEN`) and the App-Level Token (`SLACK_APP_TOKEN`).
-Socket Mode requires both tokens.
-The app-level token is stored in a dedicated `slack-app` OpenShell provider and forwarded to the sandbox alongside the bot token.
-
-If you enable Discord during onboarding, the wizard can also prompt for a Discord Server ID, whether the bot should reply only to `@mentions` or to all messages in that server, and an optional Discord User ID.
-NemoClaw bakes those values into the sandbox image as Discord guild workspace config so the bot can respond in the selected server, not just in DMs.
-If you leave the Discord User ID blank, the guild config omits the user allowlist and any member of the configured server can message the bot.
-Guild responses remain mention-gated by default unless you opt into all-message replies.
-
 Before creating the gateway, the wizard runs preflight checks.
-It verifies that Docker is reachable, warns on untested runtimes such as Podman, and prints host remediation guidance when prerequisites are missing.
-The preflight also enforces the OpenShell version range declared in the blueprint (`min_openshell_version` and `max_openshell_version`).
-If the installed OpenShell version falls outside this range, onboarding exits with an actionable error and a link to compatible releases.
+It verifies that Docker is reachable, warns on unsupported runtimes such as Podman, and prints host remediation guidance when prerequisites are missing.
 
 #### `--from <Dockerfile>`
 
@@ -142,8 +128,6 @@ $ nemoclaw deploy <instance-name>
 ### `nemoclaw <name> connect`
 
 Connect to a sandbox by name.
-On a TTY, a one-shot hint prints before dropping into the sandbox shell, reminding you to run `openclaw tui` inside.
-Set `NEMOCLAW_NO_CONNECT_HINT=1` to suppress the hint in scripted workflows.
 
 ```console
 $ nemoclaw my-assistant connect
@@ -152,8 +136,6 @@ $ nemoclaw my-assistant connect
 ### `nemoclaw <name> status`
 
 Show sandbox status, health, and inference configuration.
-For local Ollama and local vLLM routes, the command also probes the host-side health endpoint and reports whether the backend is reachable.
-If the backend is down, the output includes an `Inference: unreachable` line with the local URL and a remediation hint.
 
 ```console
 $ nemoclaw my-assistant status
@@ -173,9 +155,9 @@ $ nemoclaw my-assistant logs [--follow]
 Stop the NIM container and delete the sandbox.
 This removes the sandbox from the registry.
 
-> **Warning:** This command permanently deletes the sandbox **and its persistent volume**.
-> All workspace files (see the `nemoclaw-user-workspace` skill) (SOUL.md, USER.md, IDENTITY.md, AGENTS.md, MEMORY.md, and daily memory notes) are lost.
-> Back up your workspace first — see Backup and Restore (see the `nemoclaw-user-workspace` skill).
+> **Warning:** Destroying a sandbox permanently deletes all files inside it, including
+> workspace files (see the `nemoclaw-workspace` skill) (SOUL.md, USER.md, IDENTITY.md, AGENTS.md, MEMORY.md, and daily memory notes).
+> Back up your workspace first by following the instructions at Back Up and Restore (see the `nemoclaw-workspace` skill).
 
 ```console
 $ nemoclaw my-assistant destroy
@@ -185,20 +167,9 @@ $ nemoclaw my-assistant destroy
 
 Add a policy preset to a sandbox.
 Presets extend the baseline network policy with additional endpoints.
-Before applying, the command shows which endpoints the preset would open and prompts for confirmation.
 
 ```console
 $ nemoclaw my-assistant policy-add
-```
-
-| Flag | Description |
-|------|-------------|
-| `--dry-run` | Preview the endpoints a preset would open without applying changes |
-
-Use `--dry-run` to audit a preset before applying it:
-
-```console
-$ nemoclaw my-assistant policy-add --dry-run
 ```
 
 ### `nemoclaw <name> policy-list`
@@ -270,28 +241,6 @@ $ nemoclaw debug [--quick] [--sandbox NAME] [--output PATH]
 | `--quick` | Collect minimal diagnostics only |
 | `--sandbox NAME` | Target a specific sandbox (default: auto-detect) |
 | `--output PATH` | Write diagnostics tarball to the given path |
-
-### `nemoclaw credentials list`
-
-List the names of all credentials stored in `~/.nemoclaw/credentials.json`.
-Values are not printed.
-
-```console
-$ nemoclaw credentials list
-```
-
-### `nemoclaw credentials reset <KEY>`
-
-Remove a stored credential by name.
-After removal, re-running `nemoclaw onboard` re-prompts for that key.
-
-```console
-$ nemoclaw credentials reset NVIDIA_API_KEY
-```
-
-| Flag | Description |
-|------|-------------|
-| `--yes`, `-y` | Skip the confirmation prompt |
 
 ### `nemoclaw uninstall`
 
