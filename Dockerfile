@@ -250,6 +250,20 @@ os.chmod(path, 0o600)"
 RUN openclaw doctor --fix > /dev/null 2>&1 || true \
     && openclaw plugins install /opt/nemoclaw > /dev/null 2>&1 || true
 
+# Register bundled WhatsApp extension so openclaw channels login works
+# inside the sandbox without requiring npm or a writable config.
+# This adds the extension path to plugins.load.paths in openclaw.json,
+# the same mutation openclaw's interactive plugin installer would make.
+# Only applied when WhatsApp is selected during onboard.
+# hadolint ignore=DL4006,SC2015
+RUN WA_ENABLED="$(echo "$NEMOCLAW_MESSAGING_CHANNELS_B64" | base64 -d 2>/dev/null | grep -q '"whatsapp"' && echo 1 || echo 0)" \
+    && if [ "$WA_ENABLED" = "1" ]; then \
+         WA_EXT="/usr/local/lib/node_modules/openclaw/dist/extensions/whatsapp" \
+         && if [ -d "$WA_EXT" ] && [ -f "$WA_EXT/openclaw.plugin.json" ]; then \
+              node -e "const fs=require('fs'), p='$HOME/.openclaw/openclaw.json', c=JSON.parse(fs.readFileSync(p,'utf8')); c.plugins=c.plugins||{}; c.plugins.load=c.plugins.load||{}; c.plugins.load.paths=c.plugins.load.paths||[]; if(!c.plugins.load.paths.includes('$WA_EXT'))c.plugins.load.paths.push('$WA_EXT'); c.plugins.entries=c.plugins.entries||{}; c.plugins.entries.whatsapp=Object.assign(c.plugins.entries.whatsapp||{},{enabled:true}); c.channels=c.channels||{}; c.channels.whatsapp=Object.assign(c.channels.whatsapp||{},{enabled:true}); fs.writeFileSync(p,JSON.stringify(c,null,2))"; \
+            else echo "ERROR: WhatsApp selected but bundled extension not found at $WA_EXT" >&2; exit 1; fi; \
+       else echo "WhatsApp not selected — skipping plugin registration"; fi
+
 # Lock openclaw.json via DAC: chown to root so the sandbox user cannot modify
 # it at runtime.  This works regardless of Landlock enforcement status.
 # The Landlock policy (/sandbox/.openclaw in read_only) provides defense-in-depth
@@ -262,6 +276,33 @@ RUN openclaw doctor --fix > /dev/null 2>&1 || true \
 # The writable state lives in .openclaw-data, reached via the symlinks.
 # hadolint ignore=DL3002
 USER root
+
+# Patch OpenClaw WhatsApp extension to route WebSocket through the sandbox
+# proxy. Baileys' makeWASocket does not honor HTTPS_PROXY; without an explicit
+# agent the WebSocket connects directly and times out (408). The session chunk
+# is a pre-bundled .js file in dist/ with a hash in the filename; we find it
+# by grepping for the createWaSocket function. Requires root to write to the
+# globally-installed OpenClaw dist directory.
+# Fixed upstream in OpenClaw 2026.4.15+; remove this patch after version bump.
+# See #513.
+# hadolint ignore=DL4006,SC2015
+RUN WA_ENABLED="$(echo "$NEMOCLAW_MESSAGING_CHANNELS_B64" | base64 -d 2>/dev/null | grep -q '"whatsapp"' && echo 1 || echo 0)" \
+    && if [ "$WA_ENABLED" = "1" ]; then \
+         OC_DIST="/usr/local/lib/node_modules/openclaw/dist" \
+         && WA_CHUNK="$(grep -rl 'async function createWaSocket' "$OC_DIST"/session-*.js 2>/dev/null | head -1)" \
+         && echo "Patching WhatsApp proxy agent in: ${WA_CHUNK:-NOT FOUND}" \
+         && if [ -n "$WA_CHUNK" ] && grep -q 'markOnlineOnConnect: false' "$WA_CHUNK"; then \
+              sed -i 's|markOnlineOnConnect: false|markOnlineOnConnect: false, agent: process.env.HTTPS_PROXY ? new (__require("https-proxy-agent").HttpsProxyAgent)(process.env.HTTPS_PROXY) : undefined|' "$WA_CHUNK"; \
+              if grep -q 'HttpsProxyAgent' "$WA_CHUNK"; then \
+                echo "Patch applied successfully"; \
+              else \
+                echo "ERROR: Patch verification failed" >&2; exit 1; \
+              fi; \
+            elif node -e "const v=require('/usr/local/lib/node_modules/openclaw/package.json').version;process.exit(v>='2026.4.15'?0:1)"; then \
+              echo "OpenClaw $(node -e "process.stdout.write(require('/usr/local/lib/node_modules/openclaw/package.json').version)") has upstream proxy fix — skipping patch"; \
+            else \
+              echo "ERROR: WhatsApp proxy patch target not found — WebSocket will time out in sandbox" >&2; exit 1; fi; \
+       else echo "WhatsApp not selected — skipping proxy patch"; fi
 
 # Ensure .openclaw-data subdirs and symlinks exist for logs, credentials, and
 # sandbox. These are defined in Dockerfile.base but the GHCR base image may

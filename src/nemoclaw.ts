@@ -1629,7 +1629,7 @@ function cleanupSandboxServices(sandboxName, { stopHostServices = false } = {}) 
   }
 
   // Delete messaging providers created during onboard.
-  for (const suffix of ["telegram-bridge", "discord-bridge", "slack-bridge"]) {
+  for (const suffix of ["telegram-bridge", "discord-bridge", "slack-bridge", "whatsapp-bridge"]) {
     runOpenshell(["provider", "delete", `${sandboxName}-${suffix}`], { ignoreError: true });
   }
 }

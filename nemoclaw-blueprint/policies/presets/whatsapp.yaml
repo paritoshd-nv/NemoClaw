@@ -1,0 +1,73 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+preset:
+  name: whatsapp
+  description: "WhatsApp Web access via Baileys (WebSocket + media)"
+
+network_policies:
+  whatsapp:
+    name: whatsapp
+    endpoints:
+      # WebSocket transport — must use access: full (CONNECT tunnel).
+      # WhatsApp Web requires HTTP/1.1 for the 101 Switching Protocols
+      # upgrade; the proxy's L7 relay breaks long-lived WebSocket
+      # connections. Same pattern as Discord gateway and Slack Socket
+      # Mode. See #513, #409.
+      - host: web.whatsapp.com
+        port: 443
+        access: full
+      # Noise protocol transport — binary framing, incompatible with
+      # the proxy's L7 HTTP relay. Requires CONNECT tunnel.
+      - host: g.whatsapp.net
+        port: 443
+        access: full
+      # Noise protocol fallback port (XMPP). Only preset using non-443
+      # port — required because WhatsApp Noise protocol falls back to
+      # 5222 when 443 is blocked.
+      - host: g.whatsapp.net
+        port: 5222
+        access: full
+      # Media CDN (upload/download attachments, profile pics).
+      # POST required for sending media via WhatsApp.
+      - host: mmg.whatsapp.net
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      - host: media.whatsapp.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Static assets and config (read-only)
+      - host: static.whatsapp.net
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+      # Signal Protocol key distribution (standard HTTPS key exchange)
+      - host: pps.whatsapp.net
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Baileys version check — fetches latest protocol version from GitHub.
+      # Without this, Baileys falls back to a stale hardcoded version that
+      # WhatsApp rejects with 405 during the Noise handshake.
+      - host: raw.githubusercontent.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/WhiskeySockets/Baileys/master/src/Defaults/index.ts" }
+    binaries:
+      - { path: /usr/local/bin/node }
+      - { path: /usr/bin/node }

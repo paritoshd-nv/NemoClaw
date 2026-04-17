@@ -3200,6 +3200,14 @@ async function createSandbox(
         .filter(Boolean),
     ),
   ];
+  // WhatsApp uses QR pairing (no token), so add it if selected in step 5.
+  if (
+    Array.isArray(enabledChannels) &&
+    enabledChannels.includes("whatsapp") &&
+    !activeMessagingChannels.includes("whatsapp")
+  ) {
+    activeMessagingChannels.push("whatsapp");
+  }
   // Build allowed sender IDs map from env vars set during the messaging prompt.
   // Each channel with a userIdEnvKey in MESSAGING_CHANNELS may have a
   // comma-separated list of IDs (e.g. TELEGRAM_ALLOWED_IDS="123,456").
@@ -4409,6 +4417,14 @@ const MESSAGING_CHANNELS = [
     appTokenHelp: "Slack API → Your Apps → Basic Information → App-Level Tokens (xapp-...).",
     appTokenLabel: "Slack App Token (Socket Mode)",
   },
+  {
+    name: "whatsapp",
+    envKey: "_WHATSAPP_QR_PAIRING",
+    description: "WhatsApp messaging (QR pairing)",
+    help: "WhatsApp uses QR code pairing — no token needed during onboard.",
+    label: "WhatsApp",
+    qrPairing: true,
+  },
 ];
 
 async function setupMessagingChannels() {
@@ -4452,7 +4468,7 @@ async function setupMessagingChannels() {
       output.write(`    [${i + 1}] ${marker} ${ch.name} — ${ch.description}${status}\n`);
     });
     output.write("\n");
-    output.write("  Press 1-3 to toggle, Enter when done: ");
+    output.write(`  Press 1-${MESSAGING_CHANNELS.length} to toggle, Enter when done: `);
   };
 
   showList();
@@ -4526,6 +4542,10 @@ async function setupMessagingChannels() {
     const ch = MESSAGING_CHANNELS.find((c) => c.name === name);
     if (!ch) {
       console.log(`  Unknown channel: ${name}`);
+      continue;
+    }
+    if (ch.qrPairing) {
+      console.log(`  ✓ ${ch.name} — QR pairing after onboard: openclaw channels login --channel ${ch.name}`);
       continue;
     }
     if (getMessagingToken(ch.envKey)) {
@@ -4622,6 +4642,11 @@ function getSuggestedPolicyPresets({ enabledChannels = null, webSearchConfig = n
   maybeSuggestMessagingPreset("telegram", "TELEGRAM_BOT_TOKEN");
   maybeSuggestMessagingPreset("slack", "SLACK_BOT_TOKEN");
   maybeSuggestMessagingPreset("discord", "DISCORD_BOT_TOKEN");
+
+  // WhatsApp has no env-key (QR pairing) — suggest preset only if explicitly selected.
+  if (usesExplicitMessagingSelection && enabledChannels.includes("whatsapp")) {
+    suggestions.push("whatsapp");
+  }
 
   if (webSearchConfig) suggestions.push("brave");
 
@@ -5311,10 +5336,15 @@ async function setupPoliciesWithSelection(sandboxName, options = {}) {
   // extraSelected seeds the initial checked state beyond the tier defaults:
   // - presets already applied from a previous run
   // - credential-based additions from suggestions (e.g. brave when webSearchConfig is set)
+  // - messaging channels enabled in step 5 that have a matching preset
   const knownNames = new Set(allPresets.map((p) => p.name));
+  const channelPresets = Array.isArray(enabledChannels)
+    ? enabledChannels.filter((name) => knownNames.has(name))
+    : [];
   const extraSelected = [
     ...applied.filter((name) => knownNames.has(name)),
     ...suggestions.filter((name) => knownNames.has(name) && !applied.includes(name)),
+    ...channelPresets.filter((name) => !applied.includes(name) && !suggestions.includes(name)),
   ];
   const resolvedPresets = await selectTierPresetsAndAccess(tierName, allPresets, extraSelected);
   const interactiveChoice = resolvedPresets.map((p) => p.name);
@@ -5532,7 +5562,7 @@ function getDashboardGuidanceLines(dashboardAccess = [], options = {}) {
   return guidance;
 }
 
-function printDashboard(sandboxName, model, provider, nimContainer = null, agent = null) {
+function printDashboard(sandboxName, model, provider, nimContainer = null, agent = null, messagingChannels = []) {
   const nimStat = nimContainer ? nim.nimStatusByName(nimContainer) : nim.nimStatus(sandboxName);
   const nimLabel = nimStat.running ? "running" : "not running";
 
@@ -5603,6 +5633,13 @@ function printDashboard(sandboxName, model, provider, nimContainer = null, agent
     console.log(
       `               append  #token=<token>  to the URL, or see /tmp/gateway.log inside the sandbox.`,
     );
+  }
+  if (Array.isArray(messagingChannels) && messagingChannels.includes("whatsapp")) {
+    console.log("");
+    console.log("  WhatsApp — complete pairing inside the sandbox:");
+    console.log(`    nemoclaw ${sandboxName} connect`);
+    console.log("    openclaw channels login --channel whatsapp");
+    console.log("    # Scan the QR code with your phone to finish pairing");
   }
   console.log(`  ${"─".repeat(50)}`);
   console.log("");
@@ -6090,7 +6127,11 @@ async function onboard(opts = {}) {
 
     onboardSession.completeSession({ sandboxName, provider, model });
     completed = true;
-    printDashboard(sandboxName, model, provider, nimContainer, agent);
+    const dashboardChannels =
+      selectedMessagingChannels.length > 0
+        ? selectedMessagingChannels
+        : registry.getSandbox(sandboxName)?.messagingChannels || session?.messagingChannels || [];
+    printDashboard(sandboxName, model, provider, nimContainer, agent, dashboardChannels);
   } finally {
     releaseOnboardLock();
   }

@@ -341,3 +341,61 @@ describe("huggingface preset", () => {
     }
   });
 });
+
+describe("whatsapp preset", () => {
+  const WHATSAPP_PRESET_PATH = new URL(
+    "../nemoclaw-blueprint/policies/presets/whatsapp.yaml",
+    import.meta.url,
+  );
+  const whatsappPreset = YAML.parse(
+    readFileSync(WHATSAPP_PRESET_PATH, "utf-8"),
+  ) as Record<string, unknown>;
+
+  type Rule = { allow?: { method?: string; path?: string } };
+  type Endpoint = { host?: string; port?: number; access?: string; protocol?: string; enforcement?: string; rules?: Rule[] };
+
+  function presetEndpoints(): Endpoint[] {
+    const np = whatsappPreset.network_policies as Record<string, unknown> | undefined;
+    if (!np) return [];
+    const wa = np.whatsapp as { endpoints?: unknown } | undefined;
+    return Array.isArray(wa?.endpoints) ? (wa!.endpoints as Endpoint[]) : [];
+  }
+
+  it("regression #513: whatsapp preset file exists and parses", () => {
+    expect(whatsappPreset).toEqual(expect.objectContaining({}));
+    const meta = whatsappPreset.preset as { name?: unknown } | undefined;
+    expect(meta?.name).toBe("whatsapp");
+    const np = whatsappPreset.network_policies as Record<string, unknown> | undefined;
+    expect(np && "whatsapp" in np).toBe(true);
+  });
+
+  it("regression #513: web.whatsapp.com uses access:full for WebSocket", () => {
+    const endpoints = presetEndpoints();
+    const ws = endpoints.find((ep) => ep.host === "web.whatsapp.com");
+    expect(ws).toBeDefined();
+    expect(ws!.access).toBe("full");
+    // Must NOT have protocol:rest — that breaks WebSocket
+    expect(ws!.protocol).toBeUndefined();
+  });
+
+  it("regression #513: g.whatsapp.net uses access:full for Noise protocol", () => {
+    const endpoints = presetEndpoints();
+    const noise443 = endpoints.find((ep) => ep.host === "g.whatsapp.net" && ep.port === 443);
+    const noise5222 = endpoints.find((ep) => ep.host === "g.whatsapp.net" && ep.port === 5222);
+    expect(noise443).toBeDefined();
+    expect(noise443!.access).toBe("full");
+    expect(noise5222).toBeDefined();
+    expect(noise5222!.access).toBe("full");
+  });
+
+  it("media and static endpoints use protocol:rest with L7 enforcement", () => {
+    const l7Hosts = ["mmg.whatsapp.net", "media.whatsapp.com", "static.whatsapp.net", "pps.whatsapp.net"];
+    for (const host of l7Hosts) {
+      const ep = presetEndpoints().find((e) => e.host === host);
+      expect(ep).toBeDefined();
+      expect(ep!.protocol).toBe("rest");
+      expect(ep!.enforcement).toBe("enforce");
+      expect(ep!.access).toBeUndefined();
+    }
+  });
+});

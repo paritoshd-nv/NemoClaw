@@ -127,11 +127,12 @@ describe("tiers", () => {
       }
     });
 
-    it("includes messaging presets (slack, discord, telegram)", () => {
+    it("includes messaging presets (slack, discord, telegram, whatsapp)", () => {
       const names = tiers.getTier("open").presets.map((p: TierPreset) => p.name);
       expect(names).toContain("slack");
       expect(names).toContain("discord");
       expect(names).toContain("telegram");
+      expect(names).toContain("whatsapp");
     });
 
     it("includes productivity presets (jira, outlook)", () => {
