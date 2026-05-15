@@ -364,6 +364,7 @@ import type {
   OpenShellInstallResult,
 } from "./onboard/openshell-install";
 import { decidePolicyCarryForward } from "./onboard/policy-carryforward";
+import { resolveSandboxGpuMode, type SandboxGpuFlag, type SandboxGpuMode } from "./onboard/sandbox-gpu-mode";
 import type { SelectionDrift } from "./onboard/selection-drift";
 import type {
   ModelCatalogFetchResult,
@@ -1240,9 +1241,6 @@ function shouldAllowOpenshellAboveBlueprintMax(
   return shouldUseOpenshellDevChannel(platform, env) && isOpenshellDevVersion(versionOutput);
 }
 
-type SandboxGpuMode = "auto" | "1" | "0";
-type SandboxGpuFlag = "enable" | "disable" | null;
-
 type SandboxGpuConfig = {
   mode: SandboxGpuMode;
   hostGpuDetected: boolean;
@@ -1287,9 +1285,7 @@ function resolveSandboxGpuConfig(
     errors.push("NEMOCLAW_SANDBOX_GPU must be one of: auto, 1, 0.");
   }
 
-  let mode: SandboxGpuMode = envMode ?? "auto";
-  if (options.flag === "enable") mode = "1";
-  if (options.flag === "disable") mode = "0";
+  let mode = resolveSandboxGpuMode({ envMode, gpu, flag: options.flag });
 
   const device = (options.device ?? env.NEMOCLAW_SANDBOX_GPU_DEVICE ?? "").trim() || null;
   if (device && mode === "0") {
@@ -10035,6 +10031,8 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
             ? "  GPU passthrough requested; passing --gpu to OpenShell gateway and sandbox creation."
             : "  NVIDIA GPU detected; enabling OpenShell GPU passthrough. Use --no-gpu to opt out.",
       );
+    } else if (gpu?.platform === "jetson") {
+      note("  GPU sandbox passthrough disabled by default on Jetson.");
     } else if (process.platform === "linux") {
       // Hint when hardware is present but drivers are missing.
       try {
